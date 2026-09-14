@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Relay Personalizado (Transcodificado) - Plyr</title>
+    
+    <!-- Estilos de Plyr -->
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    
+    <style>
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden; 
+            background-color: #000;
+        }
+        /* Ajustamos para que ocupe pantalla completa */
+        .plyr {
+            width: 100%;
+            height: 100%;
+        }
+        .plyr__video-wrapper {
+            height: 100%;
+        }
+        /* Para que tu logo quede como marca de agua en una esquina (opcional) */
+        .marca-agua {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            max-width: 150px;
+            z-index: 10;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Puedes poner tu logo aquí -->
+    <!-- <img src="logo.png" class="marca-agua" alt="Logo"> -->
+
+    <!-- Etiqueta de video nativa con el poster de tu miniatura -->
+    <video id="reproductor-tv" poster="miniatura.jpg" crossorigin playsinline></video>
+
+    <!-- HLS.js (El motor que lee el m3u8 y detecta las calidades) -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+    
+    <!-- Plyr JS (La interfaz gráfica con la tuerquita) -->
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+
+    <script>
+        const video = document.getElementById('reproductor-tv');
+        const source = "https://livepeercdn.studio/hls/ca2cl3f1p5kmm35l/index.m3u8";
+        
+        // Configuramos la interfaz para que muestre la tuerca de "settings"
+        const defaultOptions = {
+            controls: ['play-large', 'play', 'live', '', 'mute', 'volume', 'settings', 'fullscreen'],
+            settings: ['quality'], // Solo mostramos la calidad en la tuerquita
+            autoplay: true,
+            muted: true // Necesario para que el autoplay funcione en navegadores modernos
+        };
+
+        // Verificamos si el navegador soporta HLS.js (Chrome, Firefox, Edge, etc.)
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(source);
+            
+            // Cuando detecta las calidades, configura el reproductor
+            hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+                
+                // Mapeamos las resoluciones (ej. 1080, 720) y agregamos '0' para la opción Automática
+                const availableQualities = hls.levels.map((l) => l.height);
+                availableQualities.unshift(0); 
+
+                // Le pasamos las calidades al reproductor
+                defaultOptions.quality = {
+                    default: 0, 
+                    options: availableQualities,
+                    forced: true,
+                    onChange: (e) => updateQuality(e),
+                };
+                
+                // Nombramos al '0' como 'Auto' en el menú
+                defaultOptions.i18n = {
+                    qualityLabel: {
+                        0: 'Auto',
+                    },
+                };
+
+                // Inicializamos la interfaz
+                new Plyr(video, defaultOptions);
+            });
+            
+            hls.attachMedia(video);
+            window.hls = hls;
+
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Soporte para Safari / iOS (que leen m3u8 nativamente sin HLS.js)
+            video.src = source;
+            new Plyr(video, defaultOptions);
+        }
+
+        // Función que le avisa al motor que cambie de calidad cuando tocas la tuerquita
+        function updateQuality(newQuality) {
+            if (newQuality === 0) {
+                window.hls.currentLevel = -1; // -1 significa Auto en HLS.js
+            } else {
+                window.hls.levels.forEach((level, levelIndex) => {
+                    if (level.height === newQuality) {
+                        window.hls.currentLevel = levelIndex;
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
